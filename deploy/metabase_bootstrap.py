@@ -41,6 +41,7 @@ WEEKDAY_MATRIX = "SELECT hour, " + ", ".join(
     for i, d in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], start=1)
 ) + f", COUNT(*) AS total FROM cpd_incidents WHERE {F} GROUP BY hour ORDER BY hour"
 
+NO_OTHER = {"graph.max_categories_enabled": False}
 LAG = "EXTRACT(EPOCH FROM (last_updated - date_time)) / 86400.0"
 
 # (tab, name, display, sql, x-col(s), y-col, width, height, extra viz settings)
@@ -49,7 +50,7 @@ CARDS = [
     # ---------------- Overview ----------------
     ("Overview", TEXT, "text", "**Cambridge (MA) Police Department - Daily Police Log**, loaded by the PAI-102 ETL pipeline "
      "(Socrata API -> Prefect -> PostgreSQL). Every card responds to the **Date, Type, Subtype and Location** filters above. "
-     "Note: the police publish incidents with a delay (see *Data freshness & quality*), so the most recent days are usually empty.", None, None, 24, 2, None),
+     "Note: the police publish incidents with a delay (see *Data freshness & quality*), so the most recent days are usually empty.", None, None, 24, 3, None),
     ("Overview", "Total incidents", "scalar", f"SELECT COUNT(*) AS incidents FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
     ("Overview", "Days with incidents", "scalar", f"SELECT COUNT(DISTINCT date_time::date) AS days FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
     ("Overview", "Average incidents per day", "scalar",
@@ -57,7 +58,7 @@ CARDS = [
     ("Overview", "Distinct locations", "scalar", f"SELECT COUNT(DISTINCT location) AS locations FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
     ("Overview", "Date range covered", "table",
      f"SELECT MIN(date_time) AS first_incident, MAX(date_time) AS last_incident, COUNT(DISTINCT type) AS types, COUNT(DISTINCT subtype) AS subtypes FROM cpd_incidents WHERE {F}",
-     None, None, 24, 2, None),
+     None, None, 24, 3, None),
     ("Overview", "Incidents per month", "line",
      f"SELECT DATE_TRUNC('month', date_time)::date AS month, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY 1 ORDER BY 1",
      "month", "incidents", 16, 6, None),
@@ -65,7 +66,7 @@ CARDS = [
      f"SELECT type, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY type ORDER BY incidents DESC", "type", "incidents", 8, 6, None),
 
     # ---------------- Daily ----------------
-    ("Daily", TEXT, "text", "**Day-by-day view.** Use the *Date* filter (e.g. *Previous 7 days*, a single date, or a range) to see any day separately.", None, None, 24, 1, None),
+    ("Daily", TEXT, "text", "**Day-by-day view.** Use the *Date* filter (e.g. *Previous 7 days*, a single date, or a range) to see any day separately.", None, None, 24, 2, None),
     ("Daily", "Incidents per day", "bar",
      f"SELECT date_time::date AS day, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY 1 ORDER BY 1", "day", "incidents", 24, 6, None),
     ("Daily", "Daily breakdown by type (newest first)", "table",
@@ -78,7 +79,7 @@ CARDS = [
     # ---------------- Trends ----------------
     ("Trends", "Monthly incidents by type", "line",
      f"SELECT DATE_TRUNC('month', date_time)::date AS month, type, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY 1, 2 ORDER BY 1",
-     ["month", "type"], "incidents", 24, 7, None),
+     ["month", "type"], "incidents", 24, 7, {"graph.y_axis.scale": "log"}),
     ("Trends", "Year-over-year by month", "line",
      f"SELECT EXTRACT(MONTH FROM date_time)::int AS month_no, year::text AS year, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY 1, 2 ORDER BY 1",
      ["month_no", "year"], "incidents", 16, 6, None),
@@ -107,7 +108,7 @@ CARDS = [
      None, None, 24, 4, None),
     ("Types & offences", "Top 20 offences (subtype)", "row",
      f"SELECT COALESCE(subtype, '(missing)') AS subtype, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY 1 ORDER BY incidents DESC LIMIT 20",
-     "subtype", "incidents", 24, 9, None),
+     "subtype", "incidents", 24, 10, NO_OTHER),
     ("Types & offences", "All offences (subtype) with counts", "table",
      f"SELECT type, COALESCE(subtype, '(missing)') AS subtype, COUNT(*) AS incidents, ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct_of_total, "
      f"MIN(date_time)::date AS first_seen, MAX(date_time)::date AS last_seen FROM cpd_incidents WHERE {F} GROUP BY 1, 2 ORDER BY incidents DESC",
@@ -116,16 +117,18 @@ CARDS = [
     # ---------------- Locations ----------------
     ("Locations", "Top 20 locations", "row",
      f"SELECT location, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY location ORDER BY incidents DESC LIMIT 20",
-     "location", "incidents", 12, 9, None),
+     "location", "incidents", 12, 10, NO_OTHER),
     ("Locations", "Top 15 intersections (location contains &)", "row",
      f"SELECT location, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} AND location LIKE '%&%' GROUP BY location ORDER BY incidents DESC LIMIT 15",
-     "location", "incidents", 12, 9, None),
+     "location", "incidents", 12, 10, NO_OTHER),
     ("Locations", "All locations", "table",
      f"SELECT location, COUNT(*) AS incidents, MODE() WITHIN GROUP (ORDER BY type) AS most_common_type, "
      f"MODE() WITHIN GROUP (ORDER BY subtype) AS most_common_offence, MIN(date_time)::date AS first_seen, MAX(date_time)::date AS last_seen "
      f"FROM cpd_incidents WHERE {F} GROUP BY location ORDER BY incidents DESC", None, None, 24, 9, None),
 
     # ---------------- Incident log ----------------
+    ("Incident log", TEXT, "text", "Every record with its free-text description. Metabase displays at most **2,000 rows** at a time - use the "
+     "**Date / Type / Subtype / Location** filters to narrow the list (e.g. a single day).", None, None, 24, 2, None),
     ("Incident log", "Incident log (every record, newest first)", "table",
      f"SELECT date_time, id, type, subtype, location, description, last_updated FROM cpd_incidents WHERE {F} ORDER BY date_time DESC",
      None, None, 24, 14, None),
@@ -133,7 +136,7 @@ CARDS = [
     # ---------------- Data freshness & quality ----------------
     ("Data freshness & quality", TEXT, "text",
      "`last_updated` is when the police published or last updated a record. Records reach the source **days after** the incident, "
-     "so this tab shows how fresh the data is and when records arrived.", None, None, 24, 2, None),
+     "so this tab shows how fresh the data is and when records arrived.", None, None, 24, 3, None),
     ("Data freshness & quality", "Latest incident in the data", "scalar", "SELECT MAX(date_time) AS latest_incident FROM cpd_incidents", None, None, 8, 3, None),
     ("Data freshness & quality", "Latest source update", "scalar", "SELECT MAX(last_updated) AS latest_update FROM cpd_incidents", None, None, 8, 3, None),
     ("Data freshness & quality", "Median publication lag (days)", "scalar",
