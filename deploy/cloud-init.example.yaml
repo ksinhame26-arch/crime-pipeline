@@ -1,0 +1,27 @@
+#cloud-config
+# Paste into Azure portal > Create VM > Advanced > "Custom data".
+# The VM then sets itself up on first boot (about 10 minutes) - no SSH needed.
+# Replace the placeholder values (or remove the write_files block to get random passwords).
+# Progress / public link: Azure portal > VM > Help > Boot diagnostics > Serial log,
+# or on the VM: sudo cat /var/log/crime-pipeline-setup.log
+write_files:
+  - path: /root/crime.env
+    permissions: "0600"
+    content: |
+      SOCRATA_APP_TOKEN=
+      POSTGRES_USER=cpd_user
+      POSTGRES_PASSWORD=<postgres-password>
+      DB_HOST=localhost
+      DB_PORT=5433
+      PGADMIN_DEFAULT_EMAIL=admin@example.com
+      PGADMIN_DEFAULT_PASSWORD=<pgadmin-password>
+      METABASE_DB_USER=metabase_user
+      METABASE_DB_PASSWORD=<metabase-db-password>
+      PREFECT_API_URL=http://localhost:4200/api
+      METABASE_ADMIN_EMAIL=<your-email>
+      METABASE_ADMIN_PASSWORD=<metabase-admin-password>
+      ETL_CRON=0 0 * * *
+      ETL_TIMEZONE=Asia/Kolkata
+      DEPLOYMENT_NAME=cpd-pipeline-azure
+runcmd:
+  - [bash, -c, "curl -fsSL https://raw.githubusercontent.com/ksinhame26-arch/crime-pipeline/main/deploy/azure_vm_setup.sh -o /root/azure_vm_setup.sh && bash /root/azure_vm_setup.sh 2>&1 | tee /var/log/crime-pipeline-setup.log > /dev/console"]

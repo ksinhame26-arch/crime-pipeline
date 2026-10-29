@@ -1,0 +1,136 @@
+# Crime-trends pipeline stack. Same file runs on the laptop and on the Azure VM.
+#   docker compose up -d                -> databases + pgAdmin + Metabase
+#   docker compose --profile etl up -d  -> also the scheduled ETL container (cloud VM)
+#
+# Security: database / pgAdmin ports are bound to 127.0.0.1, so they are reachable
+# only from the machine itself (never from the internet on the VM).
+# Only Metabase (3000) is published to the network.
+
+services:
+  postgres_cpd:                       # pipeline data warehouse
+    image: postgres:16
+    container_name: postgres_cpd
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cpd_db
+    ports:
+      - "127.0.0.1:5433:5432"         # host 5433 -> container 5432 (5432 may already be used on the laptop)
+    volumes:
+      - pgdata_cpd:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d cpd_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks: [metanet1]
+
+  pgadmin:                            # GUI to inspect the database (optional)
+    image: dpage/pgadmin4:9
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "127.0.0.1:8081:80"
+    depends_on:
+      postgres_cpd:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [metanet1]
+
+  postgres_mb:                        # Metabase's own application database (users, dashboards)
+    image: postgres:16
+    container_name: postgres_metabase
+    hostname: postgres_metabase
+    environment:
+      POSTGRES_USER: ${METABASE_DB_USER}
+      POSTGRES_PASSWORD: ${METABASE_DB_PASSWORD}
+      POSTGRES_DB: metabaseappdb
+    volumes:
+      - pgdata_mb:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${METABASE_DB_USER} -d metabaseappdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks: [metanet1]
+
+  metabase:                           # BI dashboard
+    image: metabase/metabase:v0.61.7  # pinned: 'latest' can change under you
+    container_name: metabase
+    hostname: metabase
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabaseappdb
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${METABASE_DB_USER}
+      MB_DB_PASS: ${METABASE_DB_PASSWORD}
+      MB_DB_HOST: postgres_metabase
+      JAVA_TIMEZONE: Asia/Kolkata
+      JAVA_OPTS: "-Xmx1g"            # keeps memory in check on a small VM
+    volumes:
+      - /dev/urandom:/dev/random:ro
+    depends_on:
+      postgres_mb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail -I http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+    networks: [metanet1]
+
+  prefect_server:                     # self-hosted Prefect orchestration server + web UI
+    build: ./etl                      # same image as the ETL (already has Prefect installed)
+    image: crime-pipeline-etl
+    container_name: prefect_server
+    command: prefect server start --host 0.0.0.0 --port 4200
+    environment:
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
+      PREFECT_UI_API_URL: http://localhost:4200/api
+    ports:
+      - "127.0.0.1:4200:4200"         # UI: http://localhost:4200 (SSH tunnel on the VM)
+    volumes:
+      - prefect_data:/root/.prefect   # flow-run history survives restarts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks: [metanet1]
+
+  etl:                                # the Prefect-scheduled pipeline (runs etl.serve)
+    image: crime-pipeline-etl
+    container_name: cpd_etl
+    profiles: ["etl"]                 # only starts with: docker compose --profile etl up -d
+    env_file: .env
+    environment:
+      DB_HOST: postgres_cpd           # service name on the Docker network
+      DB_PORT: 5432                   # container port, not the host port
+      # self-hosted server by default; set PREFECT_API_URL_DOCKER (+ PREFECT_API_KEY) to use Prefect Cloud
+      PREFECT_API_URL: ${PREFECT_API_URL_DOCKER:-http://prefect_server:4200/api}
+    depends_on:
+      postgres_cpd:
+        condition: service_healthy
+      prefect_server:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [metanet1]
+
+volumes:
+  pgdata_cpd:
+  pgdata_mb:
+  prefect_data:
+
+networks:
+  metanet1:
+    driver: bridge

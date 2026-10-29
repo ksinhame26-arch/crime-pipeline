@@ -1,0 +1,7 @@
+*.pyc
+.env
+.venv/
+PUBLIC_DASHBOARD_LINK.txt
+__pycache__/
+deploy/cloud-init.private.yaml
+setup_log.txt
