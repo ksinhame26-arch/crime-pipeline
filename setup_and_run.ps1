@@ -65,6 +65,9 @@ Step "6. Checking the database"
 docker exec postgres_cpd psql -U cpd_user -d cpd_db -c "SELECT COUNT(*) AS rows, MIN(date_time) AS first_incident, MAX(date_time) AS last_incident FROM cpd_incidents;" 2>&1 | Out-Host
 docker exec postgres_cpd psql -U cpd_user -d cpd_db -c "SELECT type, COUNT(*) FROM cpd_incidents GROUP BY type ORDER BY 2 DESC LIMIT 5;" 2>&1 | Out-Host
 
+Step "7. Building / updating the Metabase dashboard (8 tabs, 4 filters)"
+& $py deploy\metabase_bootstrap.py --url http://localhost:3000 2>&1 | Out-Host
+
 if ($etl -eq 0) {
     Write-Host "`nRESULT: SUCCESS - opening Metabase at http://localhost:3000 (first start can take ~1 minute)" -ForegroundColor Green
     Start-Process "http://localhost:3000"

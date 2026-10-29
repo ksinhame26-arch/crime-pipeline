@@ -66,6 +66,22 @@ crime-pipeline/
 8. **Unexpected extra columns are dropped with a warning** instead of failing.
    Missing columns still fail loudly.
 
+## Dashboard (Metabase)
+
+Built automatically by `deploy/metabase_bootstrap.py` (re-runnable; keeps the same public link).
+Four filters apply to every card: **Date** (any day, range or relative period), **Type**, **Subtype**, **Location**.
+
+| Tab | Contents |
+|---|---|
+| Overview | totals, days with incidents, average per day, distinct locations, date range, monthly trend, by type |
+| Daily | incidents per day, day-by-day breakdown by type (newest first), incidents per week |
+| Trends | monthly incidents by type, year-over-year by month, per-year totals |
+| Time patterns | by hour, by weekday, hour x weekday matrix, by day of month |
+| Types & offences | type summary, top 20 offences, all 345 offences with counts |
+| Locations | top 20 locations, top intersections, all locations (most common type/offence, first/last seen) |
+| Incident log | every record with description (newest first) |
+| Data freshness & quality | latest incident, latest source update, records by update date, publication lag, missing values, time precision |
+
 ## Run on your own system (Windows laptop)
 
 Prerequisites: Docker Desktop (WSL 2), Python 3.12.
