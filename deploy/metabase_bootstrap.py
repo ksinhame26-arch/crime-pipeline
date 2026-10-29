@@ -56,9 +56,10 @@ CARDS = [
     ("Overview", "Average incidents per day", "scalar",
      f"SELECT ROUND(COUNT(*)::numeric / NULLIF(COUNT(DISTINCT date_time::date), 0), 1) AS per_day FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
     ("Overview", "Distinct locations", "scalar", f"SELECT COUNT(DISTINCT location) AS locations FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
-    ("Overview", "Date range covered", "table",
-     f"SELECT MIN(date_time) AS first_incident, MAX(date_time) AS last_incident, COUNT(DISTINCT type) AS types, COUNT(DISTINCT subtype) AS subtypes FROM cpd_incidents WHERE {F}",
-     None, None, 24, 3, None),
+    ("Overview", "First incident", "scalar", f"SELECT MIN(date_time) AS first_incident FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
+    ("Overview", "Last incident", "scalar", f"SELECT MAX(date_time) AS last_incident FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
+    ("Overview", "Incident types", "scalar", f"SELECT COUNT(DISTINCT type) AS types FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
+    ("Overview", "Distinct offences (subtypes)", "scalar", f"SELECT COUNT(DISTINCT subtype) AS subtypes FROM cpd_incidents WHERE {F}", None, None, 6, 3, None),
     ("Overview", "Incidents per month", "line",
      f"SELECT DATE_TRUNC('month', date_time)::date AS month, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY 1 ORDER BY 1",
      "month", "incidents", 16, 6, None),
@@ -106,8 +107,8 @@ CARDS = [
      f"SELECT type, COUNT(*) AS incidents, ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct_of_total, COUNT(DISTINCT subtype) AS subtypes, "
      f"MIN(date_time)::date AS first_seen, MAX(date_time)::date AS last_seen FROM cpd_incidents WHERE {F} GROUP BY type ORDER BY incidents DESC",
      None, None, 24, 4, None),
-    ("Types & offences", "Top 20 offences (subtype)", "row",
-     f"SELECT COALESCE(subtype, '(missing)') AS subtype, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY 1 ORDER BY incidents DESC LIMIT 20",
+    ("Types & offences", "Top 15 offences (subtype)", "row",
+     f"SELECT COALESCE(subtype, '(missing)') AS subtype, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY 1 ORDER BY incidents DESC LIMIT 15",
      "subtype", "incidents", 24, 10, NO_OTHER),
     ("Types & offences", "All offences (subtype) with counts", "table",
      f"SELECT type, COALESCE(subtype, '(missing)') AS subtype, COUNT(*) AS incidents, ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct_of_total, "
@@ -115,8 +116,8 @@ CARDS = [
      None, None, 24, 9, None),
 
     # ---------------- Locations ----------------
-    ("Locations", "Top 20 locations", "row",
-     f"SELECT location, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY location ORDER BY incidents DESC LIMIT 20",
+    ("Locations", "Top 15 locations", "row",
+     f"SELECT location, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} GROUP BY location ORDER BY incidents DESC LIMIT 15",
      "location", "incidents", 12, 10, NO_OTHER),
     ("Locations", "Top 15 intersections (location contains &)", "row",
      f"SELECT location, COUNT(*) AS incidents FROM cpd_incidents WHERE {F} AND location LIKE '%&%' GROUP BY location ORDER BY incidents DESC LIMIT 15",

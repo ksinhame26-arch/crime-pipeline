@@ -73,12 +73,12 @@ Four filters apply to every card: **Date** (any day, range or relative period), 
 
 | Tab | Contents |
 |---|---|
-| Overview | totals, days with incidents, average per day, distinct locations, date range, monthly trend, by type |
+| Overview | totals, days with incidents, average per day, distinct locations, first / last incident, types, offences, monthly trend, by type |
 | Daily | incidents per day, day-by-day breakdown by type (newest first), incidents per week |
 | Trends | monthly incidents by type, year-over-year by month, per-year totals |
 | Time patterns | by hour, by weekday, hour x weekday matrix, by day of month |
-| Types & offences | type summary, top 20 offences, all 345 offences with counts |
-| Locations | top 20 locations, top intersections, all locations (most common type/offence, first/last seen) |
+| Types & offences | type summary, top 15 offences, all offences with counts |
+| Locations | top 15 locations, top 15 intersections, all locations (most common type/offence, first/last seen) |
 | Incident log | every record with description (newest first) |
 | Data freshness & quality | latest incident, latest source update, records by update date, publication lag, missing values, time precision |
 
