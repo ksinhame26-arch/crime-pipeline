@@ -23,7 +23,10 @@ def extract_data() -> pd.DataFrame:
 
     # timeout 30s instead of the 10s default: fetching every page can be slow
     with Socrata(DOMAIN, app_token, timeout=30) as client:
-        results = client.get_all(DATASET_ID)  # generator that paginates over all rows
+        # get_all pages with $offset (1,000 rows per page). Without a fixed $order,
+        # Socrata can return some rows on two pages and skip others, so a stable
+        # order (:id = Socrata's internal row id) is required for complete paging.
+        results = client.get_all(DATASET_ID, order=":id")  # generator over all rows
         df = pd.DataFrame.from_records(list(results))
 
     print(f"Extracted {len(df)} rows, columns: {list(df.columns)}")
